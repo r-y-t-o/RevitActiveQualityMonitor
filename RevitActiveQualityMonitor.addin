@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>RevitActiveQualityMonitor</Name>
+    <Assembly>RevitActiveQualityMonitor/RevitActiveQualityMonitor.dll</Assembly>
+    <FullClassName>RevitActiveQualityMonitor.App</FullClassName>
+    <ClientId>D7C5D1F6-4E2A-4B9C-9D0E-8F3A6B4C1E5D</ClientId>
+    <VendorId>com.typepad.thebuildingcoder</VendorId>
+    <VendorDescription>The Building Coder, http://thebuildingcoder.typepad.com</VendorDescription>
+  </AddIn>
+</RevitAddIns>

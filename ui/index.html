@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://qualitymonitor.local; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';">
+    <title>Model Quality Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.0.0/dist/chartjs-chart-treemap.min.js"></script>
+</head>
+
+<body>
+    <div id="width-warning" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,50,50,0.95); color:white; z-index:9999; justify-content:center; align-items:center; text-align:center; padding:20px; box-sizing:border-box;">
+        <div>
+            <h2 style="color:white; margin-bottom:10px;">Panel Too Narrow</h2>
+            <p style="font-size:14px;">Please widen the Revit panel to use the Quality Monitor effectively.</p>
+        </div>
+    </div>
+    <div class="container">
+        <header>
+            <h1>Quality Monitor <span style="font-size: 0.5em; opacity: 0.7; vertical-align: middle;">v1.3.8</span></h1>
+            <div class="header-controls">
+                <button id="theme-toggle" class="icon-btn" title="Toggle Light/Dark Mode">
+                    <!-- Icon will be inserted by JS -->
+                </button>
+                <button id="refresh-btn" title="Refresh Analysis">
+                    <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px; fill: currentColor;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <nav class="tab-navigation">
+            <button class="tab-btn active" data-tab="tab-overview">Overview</button>
+            <button class="tab-btn" data-tab="tab-rules">Rule Checks</button>
+            <button class="tab-btn" data-tab="tab-clash">Clash Detection</button>
+            <button class="tab-btn" data-tab="tab-analytics">Analytics</button>
+        </nav>
+
+        <div id="tab-overview" class="tab-content active">
+            <div class="global-actions">
+                <button class="reset-view-btn secondary-btn" title="Reset the 3D view to its normal state">Reset View</button>
+                <button class="isolate-btn secondary-btn" disabled title="Select an item below to isolate its elements in a 3D view">Isolate Elements</button>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Warnings Tree Map -->
+                <div class="card full-width">
+                    <div class="card-header">
+                        <div style="flex:1;">
+                            <h2>Warnings Distribution <span style="font-weight:400; opacity:0.6; font-size:0.9em;">• All Categories</span></h2>
+                            <div class="metric-container">
+                                <span class="metric-value" id="total-warnings-count">0</span>
+                                <span class="metric-unit">Warnings</span>
+                                <span class="metric-trend trend-down" id="warnings-trend" style="display:none;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px; height:10px; margin-right:2px;"><path d="M7 7L17 17M17 17H7M17 17V7"/></svg>
+                                    7%
+                                </span>
+                            </div>
+                            <div id="warnings-breakdown-subtext" style="margin:6px 0 0; font-size:11px; color:var(--text-secondary); line-height:1.2; display:flex; gap:12px;">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="margin-top:16px; min-height:220px;">
+                        <canvas id="warningsTreemapCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Stats Row -->
+                <div class="stats-row" style="grid-column: 1 / -1; margin-top: 10px; margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <h3>File Size</h3>
+                        <p id="file-size">-- MB</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>CAD Imports</h3>
+                        <p id="cad-imports">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>In-Place Families</h3>
+                        <p id="inplace-families">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Un-Templated Views</h3>
+                        <p id="untemplated-views">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Purgeable</h3>
+                        <p id="purgeable-elements">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Generic Models</h3>
+                        <p id="generic-models">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Unpinned Links</h3>
+                        <p id="unpinned-links">--</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Model Groups</h3>
+                        <p id="groups-count">--</p>
+                    </div>
+                </div>
+
+                <!-- Duplicates & Categories -->
+                <div class="card">
+                    <div class="card-header">
+                        <div style="flex:1;">
+                            <h2>Duplicates <span style="font-weight:400; opacity:0.6; font-size:0.9em;">• By Category</span></h2>
+                            <div class="metric-container">
+                                <span class="metric-value" id="total-duplicates-count">0</span>
+                                <span class="metric-unit">Items</span>
+                            </div>
+                            <p style="margin:6px 0 0; font-size:11px; color:var(--text-secondary); line-height:1.2;">Duplicate elements across model categories</p>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height:240px; margin-top:16px;">
+                        <canvas id="duplicatesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-rules" class="tab-content">
+            <div class="global-actions">
+                <button class="reset-view-btn secondary-btn" title="Reset the 3D view to its normal state">Reset View</button>
+                <button class="isolate-btn secondary-btn" disabled title="Select an item below to isolate its elements in a 3D view">Isolate Elements</button>
+                <button id="rule-settings-btn" class="secondary-btn" title="Open Rule Builder Settings">
+                    <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px; fill: currentColor;"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+                    Rule Settings
+                </button>
+            </div>
+            <div class="dashboard-grid" id="rules-overview-container">
+                <!-- Donut charts will be inserted here -->
+            </div>
+            
+            <div id="rules-detail-container" style="display: none; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h2 id="rules-detail-title" style="margin: 0; font-size: 16px;">Details</h2>
+                    <button id="back-to-rules-btn" class="secondary-btn" style="padding: 4px 8px; font-size: 12px;">&larr; Back</button>
+                </div>
+                <div class="stats-row" id="rules-detail-grid">
+                    <!-- Cards will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-clash" class="tab-content">
+            <!-- Clash Settings / Import-Export Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
+                <h2 style="margin: 0; font-size: 16px;">Clash Configurations</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button id="import-clash-btn" class="secondary-btn" style="padding: 4px 10px; font-size: 12px;">Import Config</button>
+                    <button id="export-clash-btn" class="secondary-btn" style="padding: 4px 10px; font-size: 12px;">Export Config</button>
+                </div>
+            </div>
+
+            <!-- New Test Form -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header" style="margin-bottom:16px;">
+                    <div style="flex:1;">
+                        <h2 style="font-size:16px;">New Clash Test</h2>
+                        <p style="font-size:11px; color:var(--text-secondary); margin-top:4px;">Define host and link categories to check for intersections</p>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 180px;">
+                        <label class="input-label">Host Category</label>
+                        <div id="host-cat-container" style="width: 100%;"></div>
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                        <label class="input-label">Linked Model</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select id="link-model-select" style="flex: 1; padding: 7px 12px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); color: var(--text-primary); outline: none;">
+                                <option value="">Select a Linked Model...</option>
+                            </select>
+                            <button id="refresh-links-btn" class="secondary-btn" title="Refresh linked models" style="padding: 6px 10px; flex-shrink: 0;">&#8635;</button>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                        <label class="input-label">Link Category</label>
+                        <div id="link-cat-container" style="width: 100%;"></div>
+                    </div>
+                    <div style="flex-shrink: 0;">
+                        <button id="add-clash-test-btn" class="secondary-btn" style="padding: 8px 16px; border-radius: 8px; border-style: dashed; font-weight: 600;">+ Add Test</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Tests List -->
+            <div id="clash-tests-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                <!-- Dynamically populated tests will go here -->
+            </div>
+
+            <div style="padding: 0 4px; margin-bottom: 24px;">
+                <button id="run-clash-btn" class="primary-btn" style="width: 100%; padding: 14px; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; background: var(--vibrant-indigo); color: white; border-radius:12px; border:none; box-shadow: 0 8px 20px -6px rgba(99, 102, 241, 0.4);">Run Clash Detection</button>
+            </div>
+
+            <div class="card" id="clash-results-card" style="display: none;">
+                <!-- Results rendered dynamically by renderClashResults() -->
+            </div>
+        </div>
+
+        <div id="tab-analytics" class="tab-content">
+            <div class="global-actions" style="display:flex; gap:8px; align-items:center;">
+                <button id="add-chart-btn">&#43; Add Chart</button>
+                <button id="export-analytics-btn" class="secondary-btn" title="Export chart config to JSON">&#8675; Export Config</button>
+                <button id="import-analytics-btn" class="secondary-btn" title="Import chart config from JSON">&#8673; Import Config</button>
+                <input type="file" id="analytics-import-input" accept=".json" style="display:none;">
+            </div>
+            <div id="analytics-gallery" class="gallery">
+                <div data-placeholder style="grid-column: 1 / -1; padding: 60px 40px; text-align: center; color: var(--text-secondary); background: var(--bg-color); border: 2px dashed var(--border-color); border-radius: 16px;">
+                    <div style="font-size: 40px; margin-bottom: 16px; opacity: 0.5;">📈</div>
+                    <h2 style="font-size: 16px; color: var(--text-primary); margin-bottom: 8px;">No Analytics Yet</h2>
+                    <p style="font-size: 13px; max-width: 300px; margin: 0 auto; line-height: 1.5;">Select a category and aggregate function above to build your first quality dashboard.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Error Overlay -->
+    <div id="error-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:10001; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+        <div style="background:var(--card-bg); width:90%; max-width:320px; padding:24px; border-radius:16px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); text-align:center;">
+            <div style="width:48px; height:48px; background:#fee2e2; color:#ef4444; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px; height:24px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <h3 style="margin-bottom:8px;">System Alert</h3>
+            <p id="error-message" style="font-size:13px; color:var(--text-secondary); line-height:1.5; margin-bottom:20px;"></p>
+            <button onclick="document.getElementById('error-overlay').style.display='none'" class="primary-btn" style="width:100%;">Acknowledge</button>
+        </div>
+    </div>
+
+    <!-- Rule Builder Modal -->
+    <div id="rule-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rule Builder Settings</h2>
+                <button id="close-modal-btn" class="icon-btn" style="font-size:20px; line-height:1;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="rule-sets-container" id="rule-sets-container">
+                    <!-- Rule sets rendered dynamically via JS -->
+                </div>
+                <button id="add-ruleset-btn" class="secondary-btn full-width" style="margin-top:16px; border-style:dashed;">+ Add New Rule Set</button>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <button id="import-rules-btn" class="secondary-btn" style="margin-right: 8px;">Import</button>
+                    <button id="export-rules-btn" class="secondary-btn">Export</button>
+                </div>
+                <div>
+                    <button id="cancel-modal-btn" class="secondary-btn" style="margin-right: 8px;">Cancel</button>
+                    <button id="save-rules-btn">Save & Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

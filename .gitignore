@@ -1,0 +1,40 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+*.userosscache
+*.sln.docstates
+
+# Packaging / staging
+staging/
+package_temp/
+*.zip
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# User-specific plugin data (written at runtime, not source)
+rulesets.json
+rulesets.bak
+
+# IDE / editor
+.vscode/
+
+# Claude Code local config
+.claude/
+
+# Temp scratch directory
+tmp/
+
+# Log files
+*.log
