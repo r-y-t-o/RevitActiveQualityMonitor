@@ -27,6 +27,10 @@ Thumbs.db
 rulesets.json
 rulesets.bak
 
+# Internal development artefacts
+Documentation/
+Example/
+
 # IDE / editor
 .vscode/
 
