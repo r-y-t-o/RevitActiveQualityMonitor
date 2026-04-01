@@ -35,8 +35,9 @@ A Revit 2026 dockable-pane plugin that provides real-time quality monitoring, cl
 1. Download and extract the ZIP as above.
 2. Copy the `RevitActiveQualityMonitor\` folder to:
    ```
-   %AppData%\Autodesk\Revit\Addins\2026\RevitActiveQualityMonitor\
+   %AppData%\Autodesk\Revit\Addins\2026\
    ```
+   The result should be `%AppData%\Autodesk\Revit\Addins\2026\RevitActiveQualityMonitor\`.
 3. Copy `RevitActiveQualityMonitor.addin` to:
    ```
    %AppData%\Autodesk\Revit\Addins\2026\
