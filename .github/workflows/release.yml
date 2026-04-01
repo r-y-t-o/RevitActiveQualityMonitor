@@ -1,75 +1,24 @@
-name: Build and Release
+# Releases are built and published locally using package.bat, which:
+#   1. Runs  dotnet build -c Release
+#   2. Packages the output into a versioned ZIP
+#   3. Pushes the version tag and creates a GitHub Release via gh CLI
+#
+# This workflow is intentionally disabled. Revit plugins require RevitAPI.dll
+# which is not available on standard CI agents.
+#
+# To publish a new release, run package.bat from the project root.
+
+name: Release (disabled)
 
 on:
-  push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'This workflow is disabled. Use package.bat locally.'
+        required: false
 
 jobs:
-  build:
-    runs-on: windows-latest
-
+  info:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore RevitAPI stubs
-        # The real RevitAPI.dll is not available on the build agent.
-        # We create minimal stub DLLs so the build resolves references without
-        # needing a full Revit install.
-        shell: pwsh
-        run: |
-          $stubDir = "C:\Program Files\Autodesk\Revit 2026"
-          New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
-          # Create empty stub DLLs (the build uses Private=False so they are
-          # not copied to output; we only need them present for reference resolution)
-          foreach ($dll in @('RevitAPI.dll', 'RevitAPIUI.dll')) {
-            $path = Join-Path $stubDir $dll
-            if (-not (Test-Path $path)) {
-              # Minimal valid PE: an empty .NET assembly compiled on the fly
-              Add-Type -OutputAssembly $path -TypeDefinition "public class _Stub {}" -OutputType Library 2>$null
-            }
-          }
-
-      - name: Build Release
-        run: dotnet build -c Release
-
-      - name: Package
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "RevitActiveQualityMonitor-${version}.zip"
-          $staging = "staging"
-
-          New-Item -ItemType Directory -Force -Path "$staging\RevitActiveQualityMonitor" | Out-Null
-
-          # Copy binaries
-          Copy-Item -Path "bin\Release\*" -Destination "$staging\RevitActiveQualityMonitor\" -Recurse -Force
-
-          # Copy manifest
-          Copy-Item "RevitActiveQualityMonitor.addin" "$staging\" -Force
-
-          # Copy installer scripts
-          Copy-Item "Install.ps1"   "$staging\" -Force
-          Copy-Item "Uninstall.ps1" "$staging\" -Force
-
-          # Create ZIP
-          Compress-Archive -Path "$staging\*" -DestinationPath $zipName -Force
-
-          Write-Host "Created $zipName"
-          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: false
-          generate_release_notes: true
-          files: ${{ env.ZIP_NAME }}
+      - run: echo "Releases are built locally. See package.bat."
