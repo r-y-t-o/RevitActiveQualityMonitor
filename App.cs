@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Reflection;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
@@ -24,15 +25,31 @@ namespace RevitActiveQualityMonitor
                 return Result.Failed;
             }
 
-            // Create Ribbon Panel
-            RibbonPanel panel = application.CreateRibbonPanel("Quality Monitor");
+            // Create dedicated ribbon tab
+            const string tabName = "Design Automation Hub";
+            try { application.CreateRibbonTab(tabName); } catch { /* already exists */ }
 
-            string thisAssemblyPath = Assembly.GetExecutingAssembly().Location;
-            PushButtonData buttonData = new PushButtonData("cmdShowQualityMonitor",
-               "Show Monitor", thisAssemblyPath, "RevitActiveQualityMonitor.Command");
+            // Create panel on that tab
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "Quality Monitor");
+
+            string assemblyPath = Assembly.GetExecutingAssembly().Location;
+            string resourcesDir = Path.Combine(Path.GetDirectoryName(assemblyPath), "Resources");
+
+            PushButtonData buttonData = new PushButtonData(
+                "cmdShowQualityMonitor", "Quality\nMonitor", assemblyPath, "RevitActiveQualityMonitor.Command");
 
             PushButton pushButton = panel.AddItem(buttonData) as PushButton;
-            pushButton.ToolTip = "Show the Quality Monitor Dashboard";
+            pushButton.ToolTip = "Open the Quality Monitor dashboard";
+
+            // Load icons from the Resources folder (copied alongside the DLL)
+            string icon32Path = Path.Combine(resourcesDir, "icon_32.png");
+            string icon16Path = Path.Combine(resourcesDir, "icon_16.png");
+
+            if (File.Exists(icon32Path))
+                pushButton.LargeImage = LoadImage(icon32Path);
+
+            if (File.Exists(icon16Path))
+                pushButton.Image = LoadImage(icon16Path);
 
             return Result.Succeeded;
         }
@@ -40,6 +57,16 @@ namespace RevitActiveQualityMonitor
         public Result OnShutdown(UIControlledApplication application)
         {
             return Result.Succeeded;
+        }
+
+        private static BitmapImage LoadImage(string path)
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.EndInit();
+            return image;
         }
     }
 }
