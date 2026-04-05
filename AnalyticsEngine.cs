@@ -60,10 +60,39 @@ namespace RevitActiveQualityMonitor
             result.UnitSuffix = GetUnitSuffix(elements.FirstOrDefault(), req.ValueParameter);
 
             bool hasGroupBy = !string.IsNullOrWhiteSpace(req.GroupByParameter);
+            bool hasBreakdown = !string.IsNullOrWhiteSpace(req.BreakdownParameter);
 
-            if (hasGroupBy)
+            if (hasGroupBy && hasBreakdown)
             {
-                // Group elements by GroupByParameter value
+                // Two-tier: primary axis = GroupByParameter, one dataset per BreakdownParameter value
+                var primaryGroups = elements
+                    .GroupBy(e => GetParamStringValue(e, req.GroupByParameter) ?? "Unknown")
+                    .OrderBy(g => g.Key)
+                    .ToList();
+
+                result.Labels = primaryGroups.Select(g => g.Key).ToList();
+
+                var breakdownValues = elements
+                    .Select(e => GetParamStringValue(e, req.BreakdownParameter) ?? "Unknown")
+                    .Distinct()
+                    .OrderBy(v => v)
+                    .ToList();
+
+                foreach (var bv in breakdownValues)
+                {
+                    var data = primaryGroups.Select(pg =>
+                    {
+                        var subset = pg.Where(e => (GetParamStringValue(e, req.BreakdownParameter) ?? "Unknown") == bv).ToList();
+                        return AggregateElements(subset, req.ValueParameter, req.AggregateFunction);
+                    }).ToList();
+                    result.Datasets.Add(new AnalyticsDataset { Label = bv, Data = data });
+                }
+
+                result.TotalMetric = result.Datasets.SelectMany(d => d.Data).Sum();
+            }
+            else if (hasGroupBy)
+            {
+                // Single-tier: group by one parameter
                 var groupings = elements.GroupBy(e => GetParamStringValue(e, req.GroupByParameter) ?? "Unknown")
                                         .OrderBy(g => g.Key)
                                         .ToList();
@@ -84,12 +113,8 @@ namespace RevitActiveQualityMonitor
                 }
                 else
                 {
-                    // Numeric Sum/Average: Should be ONE dataset by default for 1D grouping
                     var data = groupings.Select(g => AggregateElements(g.ToList(), req.ValueParameter, req.AggregateFunction)).ToList();
                     result.Datasets.Add(new AnalyticsDataset { Label = req.AggregateFunction, Data = data });
-                    
-                    // For total metric, we usually want the SUM across all elements for "Sum",
-                    // or global average for "Average"
                     result.TotalMetric = AggregateElements(elements, req.ValueParameter, req.AggregateFunction);
                 }
             }
@@ -253,6 +278,7 @@ namespace RevitActiveQualityMonitor
         public string ValueParameter { get; set; }
         public string AggregateFunction { get; set; }
         public string GroupByParameter { get; set; }
+        public string BreakdownParameter { get; set; }
     }
 
     public class AnalyticsResult

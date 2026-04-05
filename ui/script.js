@@ -2154,7 +2154,7 @@ const AGGREGATE_FUNCTIONS = [
 
 function initAnalytics() {
     document.getElementById('add-chart-btn').addEventListener('click', () => {
-        analyticsBuilderState = { step: 'chartType', chartId: 'chart_' + (++analyticsChartIdCounter) };
+        analyticsBuilderState = { step: 'reportingTier', chartId: 'chart_' + (++analyticsChartIdCounter) };
         showChartBuilderStep();
     });
 
@@ -2192,7 +2192,8 @@ function importAnalyticsConfig(e) {
                 sendMessage('runAnalytics', {
                     ChartId: def.chartId, ChartType: def.chartType,
                     Category: def.category, ValueParameter: def.valueParameter,
-                    AggregateFunction: def.aggregateFunction, GroupByParameter: def.groupByParameter || ''
+                    AggregateFunction: def.aggregateFunction, GroupByParameter: def.groupByParameter || '',
+                    BreakdownParameter: def.breakdownParameter || ''
                 });
             });
         } catch (err) { alert('Failed to import: ' + err.message); }
@@ -2201,8 +2202,13 @@ function importAnalyticsConfig(e) {
     e.target.value = '';
 }
 
+function getBuilderSteps(tier) {
+    if (tier === 'two')
+        return ['reportingTier', 'category', 'parameter', 'function', 'groupby', 'breakdown', 'chartType'];
+    return ['reportingTier', 'category', 'parameter', 'function', 'groupby', 'chartType'];
+}
+
 function showChartBuilderStep() {
-    // Remove any existing builder overlay
     const existingOverlay = document.getElementById('analytics-builder-overlay');
     if (existingOverlay) existingOverlay.remove();
 
@@ -2215,53 +2221,109 @@ function showChartBuilderStep() {
     modal.style.width = '420px';
 
     const s = analyticsBuilderState;
-    const steps = ['chartType','category','parameter','function','groupby'];
+    const steps = getBuilderSteps(s.reportingTier);
     const stepIdx = steps.indexOf(s.step);
+
+    const makeSelect = (id, options, val) =>
+        `<select id="${id}" style="width:100%; margin-top:12px;">
+            ${options.map(o => `<option value="${o.value}" ${val === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>`;
 
     let title = '';
     let body = '';
 
-    const makeSelect = (id, options, val) => {
-        return `<select id="${id}" style="width:100%; margin-top:12px;">
-            ${options.map(o => `<option value="${o.value}" ${val===o.value?'selected':''}>${o.label}</option>`).join('')}
-        </select>`;
-    };
-
-    if (s.step === 'chartType') {
-        title = 'What type of chart do you want?';
-        const selected = s.chartType || 'bar';
+    if (s.step === 'reportingTier') {
+        title = 'What type of report do you want?';
+        const sel = s.reportingTier || 'single';
+        const tiers = [
+            {
+                value: 'single',
+                label: 'Single Tier',
+                desc: 'One grouping dimension',
+                example: 'e.g. Wall count by Level',
+                svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="10" width="4" height="10"/><rect x="10" y="6" width="4" height="14"/><rect x="17" y="2" width="4" height="18"/><line x1="1" y1="21" x2="23" y2="21"/></svg>`
+            },
+            {
+                value: 'two',
+                label: 'Two Tier',
+                desc: 'Group + breakdown dimension',
+                example: 'e.g. Wall length by Level, by Type',
+                svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="14" width="3" height="6"/><rect x="7" y="10" width="3" height="10" opacity="0.5"/><rect x="13" y="8" width="3" height="12"/><rect x="17" y="12" width="3" height="8" opacity="0.5"/><line x1="1" y1="21" x2="23" y2="21"/></svg>`
+            }
+        ];
         body = `
-            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px;">
-            ${CHART_TYPES.map(ct => `
-                <label style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 8px;
-                    border:2px solid ${selected===ct.value ? 'var(--accent)' : 'var(--border-color)'};
-                    border-radius:12px; cursor:pointer; background: ${selected===ct.value ? 'rgba(99, 102, 241, 0.05)' : 'transparent'};"
-                    onclick="analyticsBuilderState.chartType='${ct.value}'; document.querySelectorAll('.ct-icon-label').forEach(l=>{l.style.borderColor='var(--border-color)';l.style.background='transparent'}); this.style.borderColor='var(--accent)';this.style.background='rgba(99, 102, 241, 0.05)';"
-                    class="ct-icon-label">
-                    <div style="width:32px; height:32px; color:${selected===ct.value ? 'var(--accent)' : 'var(--text-secondary)'};">${ct.svg}</div>
-                    <span style="font-size:12px; font-weight:500;">${ct.label}</span>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
+            ${tiers.map(t => `
+                <label style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:20px 12px;
+                    border:2px solid ${sel === t.value ? 'var(--accent)' : 'var(--border-color)'};
+                    border-radius:12px; cursor:pointer; text-align:center;
+                    background:${sel === t.value ? 'rgba(99,102,241,0.05)' : 'transparent'};"
+                    onclick="analyticsBuilderState.reportingTier='${t.value}'; document.querySelectorAll('.tier-label').forEach(l=>{l.style.borderColor='var(--border-color)';l.style.background='transparent'}); this.style.borderColor='var(--accent)'; this.style.background='rgba(99,102,241,0.05)';"
+                    class="tier-label">
+                    <div style="width:36px;height:36px;color:${sel === t.value ? 'var(--accent)' : 'var(--text-secondary)'};">${t.svg}</div>
+                    <span style="font-size:13px;font-weight:600;">${t.label}</span>
+                    <span style="font-size:12px;color:var(--text-secondary);line-height:1.4;">${t.desc}</span>
+                    <span style="font-size:11px;color:var(--text-secondary);opacity:0.7;">${t.example}</span>
                 </label>`).join('')}
             </div>`;
+
     } else if (s.step === 'category') {
         title = 'Which elements should we look at?';
         const catOptions = analyticsAvailableCategories.map(c => ({ value: c.value, label: categoryLabel(c.label) }));
         body = `<p style="font-size:13px; color:var(--text-secondary);">Choose a category from your model to analyze.</p>
             ${makeSelect('builder-category', catOptions, s.category || '')}`;
+
     } else if (s.step === 'parameter') {
-        title = `Great! What parameter of ${categoryLabel(s.category)}?`;
+        title = `What parameter of ${categoryLabel(s.category)}?`;
         const paramOptions = analyticsAvailableParameters.map(p => ({ value: p, label: p }));
-        body = `<p style="font-size:13px; color:var(--text-secondary);">Select the numerical or text property to measure.</p>
-                ${makeSelect('builder-parameter', paramOptions, s.valueParameter || '')}`;
+        body = `<p style="font-size:13px; color:var(--text-secondary);">Select the property to measure.</p>
+            ${makeSelect('builder-parameter', paramOptions, s.valueParameter || '')}`;
+
     } else if (s.step === 'function') {
-        title = `How should we calculate the result?`;
-        body = `<p style="font-size:13px; color:var(--text-secondary);">Do you want to see the total sum, the average, or just count them?</p>
+        title = 'How should we calculate the result?';
+        body = `<p style="font-size:13px; color:var(--text-secondary);">Total sum, average, or count?</p>
             ${makeSelect('builder-function', AGGREGATE_FUNCTIONS, s.aggregateFunction || 'Count')}`;
+
     } else if (s.step === 'groupby') {
-        title = `Finally, how do you want to group them?`;
+        title = s.reportingTier === 'two' ? 'What is the primary grouping?' : 'How do you want to group them?';
+        const hint = s.reportingTier === 'two'
+            ? 'The primary axis — e.g. Level.'
+            : 'Split the data by a property — e.g. Level.';
         const groupByOptions = [{ value: '', label: '— No Grouping —' }, ...analyticsAvailableParameters.map(p => ({ value: p, label: p }))];
-        body = `<p style="font-size:13px; color:var(--text-secondary);">Select a property to split the data (e.g., By Level).</p>
+        body = `<p style="font-size:13px; color:var(--text-secondary);">${hint}</p>
             ${makeSelect('builder-groupby', groupByOptions, s.groupByParameter || '')}`;
+
+    } else if (s.step === 'breakdown') {
+        title = 'What should we break it down by?';
+        const breakdownOptions = analyticsAvailableParameters.map(p => ({ value: p, label: p }));
+        body = `<p style="font-size:13px; color:var(--text-secondary);">The secondary dimension — e.g. Family Type. Each unique value becomes a series.</p>
+            ${makeSelect('builder-breakdown', breakdownOptions, s.breakdownParameter || '')}`;
+
+    } else if (s.step === 'chartType') {
+        title = 'What type of chart do you want?';
+        const allowed = s.reportingTier === 'two'
+            ? ['stackedBar', 'groupedBar']
+            : ['bar', 'horizontalBar', 'pie', 'doughnut'];
+        const tierTypes = CHART_TYPES.filter(ct => allowed.includes(ct.value));
+        // Default to first allowed type if current selection is incompatible
+        if (!tierTypes.find(ct => ct.value === s.chartType)) s.chartType = tierTypes[0]?.value;
+        const selected = s.chartType;
+        body = `
+            <div style="display:grid; grid-template-columns:repeat(${tierTypes.length <= 2 ? 2 : 3},1fr); gap:12px; margin-top:16px;">
+            ${tierTypes.map(ct => `
+                <label style="display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 8px;
+                    border:2px solid ${selected === ct.value ? 'var(--accent)' : 'var(--border-color)'};
+                    border-radius:12px; cursor:pointer;
+                    background:${selected === ct.value ? 'rgba(99,102,241,0.05)' : 'transparent'};"
+                    onclick="analyticsBuilderState.chartType='${ct.value}'; document.querySelectorAll('.ct-icon-label').forEach(l=>{l.style.borderColor='var(--border-color)';l.style.background='transparent'}); this.style.borderColor='var(--accent)';this.style.background='rgba(99,102,241,0.05)';"
+                    class="ct-icon-label">
+                    <div style="width:32px;height:32px;color:${selected === ct.value ? 'var(--accent)' : 'var(--text-secondary)'};">${ct.svg}</div>
+                    <span style="font-size:12px;font-weight:500;">${ct.label}</span>
+                </label>`).join('')}
+            </div>`;
     }
+
+    const isLastStep = stepIdx === steps.length - 1;
 
     modal.innerHTML = `
         <div class="modal-header">
@@ -2270,14 +2332,14 @@ function showChartBuilderStep() {
         </div>
         <div class="modal-body">
             <div style="display:flex; gap:4px; margin-bottom:20px;">
-                ${steps.map((st, i) => `<div style="flex:1; height:4px; border-radius:2px; background:${i <= stepIdx ? 'var(--accent)' : 'var(--border-color)'}; transition: background 0.3s;"></div>`).join('')}
+                ${steps.map((st, i) => `<div style="flex:1; height:4px; border-radius:2px; background:${i <= stepIdx ? 'var(--accent)' : 'var(--border-color)'}; transition:background 0.3s;"></div>`).join('')}
             </div>
             ${body}
         </div>
         <div class="modal-footer">
             ${stepIdx > 0 ? `<button id="builder-back" class="secondary-btn" style="margin-right:auto;">Back</button>` : ''}
-            <button id="builder-cancel" class="secondary-btn" style="margin-right:8px;">Cancel Builder</button>
-            <button id="builder-next">${s.step === 'groupby' ? 'Build My Dashboard' : 'Continue'}</button>
+            <button id="builder-cancel" class="secondary-btn" style="margin-right:8px;">Cancel</button>
+            <button id="builder-next">${isLastStep ? 'Build Chart' : 'Continue'}</button>
         </div>
     `;
 
@@ -2292,15 +2354,18 @@ function showChartBuilderStep() {
     }
 
     document.getElementById('builder-next').onclick = () => {
-        if (s.step === 'chartType') {
-            s.chartType = s.chartType || 'bar';
+        if (s.step === 'reportingTier') {
+            s.reportingTier = s.reportingTier || 'single';
+            // Clear chartType if it's incompatible with the selected tier
+            const allowed = s.reportingTier === 'two' ? ['stackedBar', 'groupedBar'] : ['bar', 'horizontalBar', 'pie', 'doughnut'];
+            if (s.chartType && !allowed.includes(s.chartType)) s.chartType = null;
             s.step = 'category';
             showChartBuilderStep();
         } else if (s.step === 'category') {
             s.category = document.getElementById('builder-category').value;
             s.step = 'parameter';
             sendMessage('getAnalyticsParameters', { category: s.category, chartId: s.chartId });
-            showChartBuilderStep(); 
+            showChartBuilderStep();
         } else if (s.step === 'parameter') {
             s.valueParameter = document.getElementById('builder-parameter').value;
             s.step = 'function';
@@ -2311,25 +2376,32 @@ function showChartBuilderStep() {
             showChartBuilderStep();
         } else if (s.step === 'groupby') {
             s.groupByParameter = document.getElementById('builder-groupby').value;
+            s.step = s.reportingTier === 'two' ? 'breakdown' : 'chartType';
+            showChartBuilderStep();
+        } else if (s.step === 'breakdown') {
+            s.breakdownParameter = document.getElementById('builder-breakdown').value;
+            s.step = 'chartType';
+            showChartBuilderStep();
+        } else if (s.step === 'chartType') {
+            const defaultType = s.reportingTier === 'two' ? 'stackedBar' : 'bar';
+            s.chartType = s.chartType || defaultType;
             overlay.remove();
             const def = { ...s };
-            analyticsCharts.push({ id: s.chartId, def: def });
+            analyticsCharts.push({ id: s.chartId, def });
             sendMessage('runAnalytics', {
                 ChartId: def.chartId, ChartType: def.chartType, Category: def.category,
                 ValueParameter: def.valueParameter, AggregateFunction: def.aggregateFunction,
-                GroupByParameter: def.groupByParameter || ''
+                GroupByParameter: def.groupByParameter || '',
+                BreakdownParameter: def.breakdownParameter || ''
             });
             addAnalyticsLoadingCard(def);
         }
     };
 
-    const cancelBtnInFooter = document.getElementById('builder-cancel');
-    if (cancelBtnInFooter) {
-        cancelBtnInFooter.onclick = () => {
-            overlay.remove();
-            analyticsBuilderState = {};
-        };
-    }
+    document.getElementById('builder-cancel').onclick = () => {
+        overlay.remove();
+        analyticsBuilderState = {};
+    };
 }
 
 function onAnalyticsParametersReceived(chartId) {
@@ -2399,7 +2471,9 @@ function renderAnalyticsChart(result) {
 
     // Premium Card Header & Metrics (Match Reference Images)
     const formattedMetric = result.TotalMetric % 1 === 0 ? result.TotalMetric.toLocaleString() : result.TotalMetric.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    const desc = `${categoryLabel(def.category)} grouped by ${def.groupByParameter || 'None'}`;
+    const desc = def.breakdownParameter
+        ? `${categoryLabel(def.category)} • ${def.groupByParameter || 'ungrouped'} × ${def.breakdownParameter}`
+        : `${categoryLabel(def.category)} grouped by ${def.groupByParameter || 'None'}`;
 
     card.innerHTML = `
         <div class="card-header" style="margin-bottom:0px;">
@@ -2419,6 +2493,7 @@ function renderAnalyticsChart(result) {
         <div class="chart-container" style="margin-top:16px;">
             <canvas id="canvas-${result.ChartId}"></canvas>
         </div>
+        <div id="legend-${result.ChartId}"></div>
     `;
 
     card.querySelector('[data-delete]').onclick = () => {
@@ -2469,7 +2544,8 @@ function renderAnalyticsChart(result) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: datasets.length > 1,
+                    // Built-in legend for multi-dataset (two-tier) and pie/doughnut
+                    display: datasets.length > 1 || chartType === 'pie' || chartType === 'doughnut',
                     position: 'bottom',
                     labels: { boxWidth: 10, usePointStyle: true, font: { family: 'Outfit', size: 10 }, padding: 15 }
                 },
@@ -2509,6 +2585,21 @@ function renderAnalyticsChart(result) {
         entry.chartInstance = instance;
     } else {
         analyticsCharts.push({ id: result.ChartId, def, chartInstance: instance });
+    }
+
+    // Custom per-bar colour legend for single-dataset bar/horizontalBar charts
+    // (pie/doughnut and multi-dataset use Chart.js built-in legend above)
+    if (isSingleDataset && chartType !== 'pie' && chartType !== 'doughnut') {
+        const legendEl = document.getElementById(`legend-${result.ChartId}`);
+        if (legendEl) {
+            legendEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:10px;padding:0 4px;';
+            legendEl.innerHTML = result.Labels.map((lbl, j) =>
+                `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--text-secondary);">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${ANALYTICS_COLORS[j % ANALYTICS_COLORS.length]};"></span>
+                    ${lbl}
+                </span>`
+            ).join('');
+        }
     }
 }
 
