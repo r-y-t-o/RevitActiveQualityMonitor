@@ -2408,10 +2408,6 @@ function renderAnalyticsChart(result) {
                 <div class="metric-container">
                     <span class="metric-value">${formattedMetric}</span>
                     <span class="metric-unit">${result.UnitSuffix || ''}</span>
-                    <span class="metric-trend trend-up">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:10px; height:10px; margin-right:2px;"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
-                        ${Math.floor(Math.random()*5)+1}%
-                    </span>
                 </div>
                 <p style="margin:6px 0 0; font-size:11px; color:var(--text-secondary); line-height:1.2;">${desc}</p>
                 ${result.TotalUniqueValues > 0 && result.TotalUniqueValues > result.Labels.length
@@ -2420,7 +2416,7 @@ function renderAnalyticsChart(result) {
             </div>
             <button data-delete="${result.ChartId}" class="icon-btn" style="background:#f1f5f9; color:#64748b; font-size:10px; width:24px; height:24px;">✕</button>
         </div>
-        <div class="chart-container" style="height:220px; margin-top:16px;">
+        <div class="chart-container" style="margin-top:16px;">
             <canvas id="canvas-${result.ChartId}"></canvas>
         </div>
     `;
@@ -2430,22 +2426,33 @@ function renderAnalyticsChart(result) {
         analyticsCharts = analyticsCharts.filter(c => c.id !== result.ChartId);
     };
 
+    // For horizontal bars, grow the card height to fit all labels without overlap
+    const isHorizontalCheck = chartType === 'horizontalBar';
+    const labelCount = (result.Labels || []).length;
+    const chartHeight = isHorizontalCheck ? Math.max(220, labelCount * 28) : 220;
+    card.querySelector('.chart-container').style.height = chartHeight + 'px';
+
     const ctx = document.getElementById(`canvas-${result.ChartId}`).getContext('2d');
-    
+
+    // Color each bar individually when there is only one dataset (no group-by);
+    // when multiple datasets exist (grouped/stacked), each dataset gets its own solid colour.
+    const isSingleDataset = (result.Datasets || []).length === 1;
+    const perBarColors = (chartType === 'pie' || chartType === 'doughnut' || isSingleDataset);
+
     // Prepare Data
     const datasets = (result.Datasets || []).map((ds, i) => ({
         label: ds.Label,
         data: ds.Data,
-        backgroundColor: (chartType === 'pie' || chartType === 'doughnut') 
+        backgroundColor: perBarColors
             ? ds.Data.map((_, j) => ANALYTICS_COLORS[j % ANALYTICS_COLORS.length])
             : ANALYTICS_COLORS[i % ANALYTICS_COLORS.length],
-        borderRadius: chartType === 'bar' || chartType === 'horizontalBar' ? 8 : 0,
+        borderRadius: chartType === 'bar' || chartType === 'horizontalBar' ? 6 : 0,
         borderWidth: 0,
-        barThickness: 24, // Consistent bar width
+        maxBarThickness: 40,
         hoverOffset: 4
     }));
 
-    const isHorizontal = chartType === 'horizontalBar';
+    const isHorizontal = isHorizontalCheck;
     const isStacked = chartType === 'stackedBar';
     let baseType = chartType;
     if (baseType === 'stackedBar' || baseType === 'groupedBar' || baseType === 'horizontalBar') baseType = 'bar';
@@ -2478,12 +2485,18 @@ function renderAnalyticsChart(result) {
                 }
             },
             scales: (chartType === 'pie' || chartType === 'doughnut') ? {} : {
-                x: { 
+                x: {
                     stacked: isStacked,
                     grid: { display: false },
-                    ticks: { font: { family: 'Outfit', size: 10 }, color: '#94a3b8' }
+                    ticks: {
+                        font: { family: 'Outfit', size: 10 },
+                        color: '#94a3b8',
+                        maxRotation: isHorizontal ? 0 : 45,
+                        autoSkip: true,
+                        maxTicksLimit: isHorizontal ? undefined : 20
+                    }
                 },
-                y: { 
+                y: {
                     stacked: isStacked,
                     grid: { color: '#f1f5f9', drawBorder: false },
                     ticks: { font: { family: 'Outfit', size: 10 }, color: '#94a3b8', padding: 8 }
